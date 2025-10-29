@@ -1,0 +1,106 @@
+name: Run US Visa Bot (scheduled)
+
+on:
+  schedule:
+    # Runs every 5 minutes — adjust if you prefer a different cadence
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      current:
+        description: 'Current booked date (YYYY-MM-DD) — overrides secret CURRENT_DATE if provided'
+        required: false
+        default: ''
+      target:
+        description: 'Target date to stop at (YYYY-MM-DD)'
+        required: false
+        default: ''
+      min:
+        description: 'Minimum acceptable date (YYYY-MM-DD)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Run in dry-run mode (true/false)'
+        required: false
+        default: 'true'
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run bot
+        env:
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          COUNTRY_CODE: ${{ secrets.COUNTRY_CODE }}
+          SCHEDULE_ID: ${{ secrets.SCHEDULE_ID }}
+          FACILITY_ID: ${{ secrets.FACILITY_ID }}
+          REFRESH_DELAY: ${{ secrets.REFRESH_DELAY }}
+          CURRENT_INPUT: ${{ github.event.inputs.current }}
+          TARGET_INPUT: ${{ github.event.inputs.target }}
+          MIN_INPUT: ${{ github.event.inputs.min }}
+          DRY_INPUT: ${{ github.event.inputs.dry_run }}
+          CURRENT_SECRET: ${{ secrets.CURRENT_DATE }}
+          TARGET_SECRET: ${{ secrets.TARGET_DATE }}
+          MIN_SECRET: ${{ secrets.MIN_DATE }}
+        run: |
+          set -euo pipefail
+
+          # Prefer workflow input, fall back to repository secret CURRENT_DATE
+          CURRENT=${CURRENT_INPUT:-${CURRENT_SECRET:-}}
+          TARGET=${TARGET_INPUT:-${TARGET_SECRET:-}}
+          MIN=${MIN_INPUT:-${MIN_SECRET:-}}
+          DRY=${DRY_INPUT:-true}
+
+          if [ -z "$CURRENT" ]; then
+            echo "ERROR: no current date specified (provide via workflow input 'current' or add secret CURRENT_DATE)"
+            exit 1
+          fi
+
+          ARGS=("-c" "$CURRENT")
+          if [ -n "$TARGET" ]; then
+            ARGS+=("-t" "$TARGET")
+          fi
+          if [ -n "$MIN" ]; then
+            ARGS+=("-m" "$MIN")
+          fi
+          if [ "$DRY" = "true" ]; then
+            ARGS+=("--dry-run")
+          fi
+
+          echo "Running: node src/index.js ${ARGS[*]}"
+          node src/index.js "${ARGS[@]}"
+
+      - name: Check booking result
+        id: check
+        run: |
+          if [ -f booking_result.json ]; then
+            echo "booked=true" >> $GITHUB_OUTPUT
+            echo "result<<EOF" >> $GITHUB_OUTPUT
+            cat booking_result.json >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "booked=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send email notification if booked
+        if: steps.check.outputs.booked == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_HOST }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASS }}
+          subject: "US Visa appointment booked"
+          body: "${{ steps.check.outputs.result }}"
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: ${{ secrets.EMAIL }}

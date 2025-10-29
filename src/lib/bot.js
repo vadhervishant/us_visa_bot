@@ -155,12 +155,12 @@ export class Bot {
 
     if (!time) {
       log(`no available time slots for date ${targetDate}`);
-      return false;
+      return { success: false };
     }
 
     if (this.dryRun) {
       log(`[DRY RUN] Would book appointment at ${targetDate} ${time} (facility ${targetFacility}) (not actually booking)`);
-      return true;
+      return { success: true, date: targetDate, facilityId: targetFacility, time: 'DRY_RUN' };
     }
 
     await this.client.book(
@@ -172,7 +172,7 @@ export class Bot {
     );
 
     log(`booked time at ${targetDate} ${time} (facility ${targetFacility})`);
-    return true;
+    return { success: true, date: targetDate, facilityId: targetFacility, time };
   }
 
 }

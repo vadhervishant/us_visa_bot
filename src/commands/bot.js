@@ -1,6 +1,7 @@
 import { Bot } from '../lib/bot.js';
 import { getConfig } from '../lib/config.js';
 import { log, sleep, isSocketHangupError } from '../lib/utils.js';
+import fs from 'fs/promises';
 
 const COOLDOWN = 3600; // 1 hour in seconds
 
@@ -41,9 +42,24 @@ export async function botCommand(options) {
           ? availableDate.date
           : availableDate;
 
-        const booked = await bot.bookAppointment(sessionHeaders, availableDate);
+        const bookedResult = await bot.bookAppointment(sessionHeaders, availableDate);
 
-        if (booked) {
+        if (bookedResult && bookedResult.success) {
+          // Write booking result for external workflows/notifications
+          try {
+            const payload = {
+              date: bookedResult.date || selectedDate,
+              facilityId: bookedResult.facilityId || (typeof availableDate === 'object' ? availableDate.facilityId : null),
+              time: bookedResult.time || null,
+              dryRun: options.dryRun || false
+            };
+
+            await fs.writeFile('booking_result.json', JSON.stringify(payload, null, 2));
+            log(`Wrote booking_result.json: ${JSON.stringify(payload)}`);
+          } catch (e) {
+            log(`Failed to write booking_result.json: ${e.message}`);
+          }
+
           // Update current date to the new available date
           currentBookedDate = selectedDate;
 
@@ -56,6 +72,9 @@ export async function botCommand(options) {
             log(`Target date reached! Successfully booked appointment on ${selectedDate}`);
             process.exit(0);
           }
+
+          // Exit after a booking so external workflow can pick up the result and notify
+          process.exit(0);
         }
       }
 
