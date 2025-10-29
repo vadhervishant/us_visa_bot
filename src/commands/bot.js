@@ -73,8 +73,13 @@ export async function botCommand(options) {
             process.exit(0);
           }
 
-          // Exit after a booking so external workflow can pick up the result and notify
-          process.exit(0);
+          // Exit after a booking only when running inside GitHub Actions (so Actions can pick up the result).
+          // For long-running deployments (Render, Fly) we should keep the process alive.
+          if (process.env.GITHUB_ACTIONS === 'true') {
+            process.exit(0);
+          } else {
+            log('Booking completed; continuing to run (not exiting in deployed mode)');
+          }
         }
       }
 
