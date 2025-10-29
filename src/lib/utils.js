@@ -66,3 +66,14 @@ export function isSocketHangupError(err) {
          err.message.includes('network') ||
          err.message.includes('connection');
 }
+
+// Simple lifecycle flag to coordinate graceful shutdown across modules.
+let _shuttingDown = false;
+
+export function setShuttingDown(val = true) {
+  _shuttingDown = Boolean(val);
+}
+
+export function isShuttingDown() {
+  return _shuttingDown;
+}

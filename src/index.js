@@ -3,6 +3,7 @@
 import { program } from 'commander';
 import { botCommand } from './commands/bot.js';
 import http from 'http';
+import { setShuttingDown } from './lib/utils.js';
 
 program
   .name('us-visa-bot')
@@ -67,23 +68,28 @@ if (port) {
     console.log(`Health endpoint listening on port ${port}`);
   });
 
-  // Graceful shutdown for common signals
+  // Graceful shutdown for common signals. Set shutdown flag so background
+  // bot loop can finish its current iteration and persist state. Then wait
+  // up to SHUTDOWN_TIMEOUT (seconds) before forcing the server closed.
   const graceful = () => {
-    console.log('Received shutdown signal, closing server...');
-    if (server && typeof server.close === 'function') {
-      server.close(() => {
-        console.log('Server closed, exiting.');
-        process.exit(0);
-      });
+    const timeoutSec = Number(process.env.SHUTDOWN_TIMEOUT || 25);
+    console.log(`Received shutdown signal, initiating graceful shutdown (waiting up to ${timeoutSec}s)...`);
 
-      // Force exit if close doesn't finish within a timeout
-      setTimeout(() => {
-        console.error('Graceful shutdown timed out, forcing exit.');
-        process.exit(1);
-      }, 10_000).unref();
-    } else {
-      process.exit(0);
-    }
+    // Tell other modules to stop starting new work
+    setShuttingDown(true);
+
+    // Wait a short time for the bot loop to notice the flag and persist state.
+    setTimeout(() => {
+      console.log('Closing server now.');
+      if (server && typeof server.close === 'function') {
+        server.close(() => {
+          console.log('Server closed, exiting.');
+          process.exit(0);
+        });
+      } else {
+        process.exit(0);
+      }
+    }, timeoutSec * 1000).unref();
   };
 
   process.on('SIGTERM', graceful);

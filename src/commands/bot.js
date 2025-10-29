@@ -1,6 +1,6 @@
 import { Bot } from '../lib/bot.js';
 import { getConfig } from '../lib/config.js';
-import { log, sleep, isSocketHangupError } from '../lib/utils.js';
+import { log, sleep, isSocketHangupError, isShuttingDown } from '../lib/utils.js';
 import fs from 'fs/promises';
 
 const COOLDOWN = 3600; // 1 hour in seconds
@@ -30,6 +30,20 @@ export async function botCommand(options) {
     const sessionHeaders = await bot.initialize();
 
     while (true) {
+      if (isShuttingDown()) {
+        // Stop starting new work; persist current state so the process that
+        // restarts can resume from the same `currentBookedDate`.
+        try {
+          const payload = { currentBookedDate };
+          await fs.writeFile('booking_state.json', JSON.stringify(payload, null, 2));
+          log('Shutting down: wrote booking_state.json');
+        } catch (e) {
+          log(`Failed to persist booking_state.json during shutdown: ${e && e.message ? e.message : String(e)}`);
+        }
+
+        log('Shutdown flag set, exiting bot loop cleanly.');
+        return;
+      }
       const availableDate = await bot.checkAvailableDate(
         sessionHeaders,
         currentBookedDate,
