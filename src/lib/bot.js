@@ -53,12 +53,14 @@ export class Bot {
       const date = entry.date;
 
       if (date >= currentBookedDate) {
-        log(`date ${date} (facility ${entry.facilityId}) is further than already booked (${currentBookedDate})`);
+        log(`This date (${date}) is farther away from the currentdate (${currentBookedDate}) at facility (${entry.facilityId})`);
         return false;
       }
 
-      if (minDate && date < minDate) {
-        log(`date ${date} (facility ${entry.facilityId}) is before minimum date (${minDate})`);
+      // Changed the condition to find the appointments which are above the min date 
+      // Earlier it was checking for below the min date just change the > to <
+      if (minDate && date > minDate) {
+        log(`date ${date} (facility ${entry.facilityId}) is after minimum date (${minDate})`);
         return false;
       }
 
@@ -124,7 +126,7 @@ export class Bot {
 
             if (time) {
               targetFacility = fid;
-              log(`found time at facility ${fid} for date ${targetDate}`);
+              log(`found time at facility ${fid} for date ${targetDate}`, "SUCCESS");
               break;
             }
           } catch (err) {
@@ -159,7 +161,7 @@ export class Bot {
     }
 
     if (this.dryRun) {
-      log(`[DRY RUN] Would book appointment at ${targetDate} ${time} (facility ${targetFacility}) (not actually booking)`);
+      log(`[DRY RUN] Would book appointment at ${targetDate} ${time} (facility ${targetFacility}) (not actually booking)`, 'SUCCESS');
       return { success: true, date: targetDate, facilityId: targetFacility, time: 'DRY_RUN' };
     }
 
@@ -171,7 +173,7 @@ export class Bot {
       time
     );
 
-    log(`booked time at ${targetDate} ${time} (facility ${targetFacility})`);
+    log(`booked time at ${targetDate} ${time} (facility ${targetFacility})`, 'SUCCESS');
     return { success: true, date: targetDate, facilityId: targetFacility, time };
   }
 
