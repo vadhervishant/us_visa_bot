@@ -53,7 +53,7 @@ export class Bot {
       const date = entry.date;
 
       if (date >= currentBookedDate) {
-        log(`This date (${date}) is farther away from the currentdate (${currentBookedDate}) at facility (${entry.facilityId})`);
+        // log(`This date (${date}) is farther away from the currentdate (${currentBookedDate}) at facility (${entry.facilityId})`);
         return false;
       }
 

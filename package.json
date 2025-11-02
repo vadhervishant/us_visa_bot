@@ -15,6 +15,7 @@
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
     "commander": "^14.0.0",
+    "cron": "^4.3.3",
     "dotenv": "^16.4.7",
     "node-fetch": "^3.3.0"
   }
